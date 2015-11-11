@@ -8,4 +8,4 @@ At now, there are 4 py files, and 2 data files,1 UI file.
  Derive pairs trading strategy and back test class from abstract base classes.
 ##(4) 584APP.py       
  combine all things together. It connects to PriceUI.ui(this UI file is created by PYQT designer), display a simple interface, that user can change stocks and use the predefined pairs trading strategy to back test it.
-The project contain 3 questions, now is in 1st question.
+###The project contain 3 questions, now is in 1st question.
