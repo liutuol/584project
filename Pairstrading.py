@@ -11,10 +11,11 @@ import numpy as np
 from backtest import Portfolio,Strategy
 from getyahooandstore import get_price
 import matplotlib.pyplot as plt
+from decimal import Decimal
 
 
 
-def generate_bars(pair,START = "2005-01-01"):
+def generate_bars(pair,START = "2001-01-01"):
     """this function is used to get bars(adjclose) from pair"""    
     bars = pd.DataFrame([])
     bars[pair[0]] = get_price(pair[0], START)
@@ -33,12 +34,12 @@ class SinglePairstradingStrategy(Strategy):
 
     """
 
-    def __init__(self, pair, bars, buy_signal=2,sell_signal=-2, window=30):
+    def __init__(self, pair, bars, buy_signal=-2,sell_signal=2, window=30):
         self.pair = pair
         self.bars = bars
-        self.buy_signal = buy_signal
-        self.sell_signal = sell_signal
-        self.window = window
+        self.buy_signal = float(buy_signal)
+        self.sell_signal = float(sell_signal)
+        self.window = int(window)
       
 
     def generate_signals(self):
@@ -57,13 +58,14 @@ class SinglePairstradingStrategy(Strategy):
         # Create a 'signal' buy when AtoB['delta']>buy_signal, sell when AtoB['delta']<sell_signal
         
         signals['signal'][self.window:] = AtoB['delta'][self.window:].apply(
-        lambda x: 1 if x > self.buy_signal else (-1 if x < self.sell_signal else 0))  
+        lambda x: -1 if x > self.sell_signal else (1 if x < self.buy_signal else 0))  
 
         # Take the difference of the signals in order to generate actual trading orders for pair
         for i in range(self.window,len(signals)):                         
             signals['Longshortstatues'][i] = signals['Longshortstatues'][i-1] + signals['tradesignal'][i-1]
             if signals['signal'][i] != 0 :
                 signals['tradesignal'][i] = signals['signal'][i] - signals['Longshortstatues'][i]
+        signals['tradesignal'][-1] = - signals['Longshortstatues'][-1]
         # generate signal for stock,this is trading signal not position
         signals[self.pair[0]] = signals['tradesignal']
         signals[self.pair[1]] = -signals['tradesignal'] * AtoB['MA']
@@ -93,48 +95,65 @@ class PairstradingPortfolio(Portfolio):
     signals - A pandas DataFrame of signals (1, 0, -1) for each symbol.
     initial_capital - The amount in cash at the start of the portfolio."""
 
-    def __init__(self, symbols, bars, signals, initial_capital=1000000.0):
-        self.symbols = symbols        
+    def __init__(self, pair, bars, signals, initial_capital=1000000.0):
+        self.pair = pair        
         self.bars = bars
         self.signals = signals
         self.initial_capital = float(initial_capital)
         self.positions = self.generate_positions()
         
     def generate_positions(self):
-        positions = pd.DataFrame(index=self.signals.index).fillna(0.0)
-        for symbol in self.symbols:            
-            positions[symbol] = 100*self.signals[symbol].cumsum()   # This strategy buys 1 shares
+                               
+        positions = self.initial_capital/(self.bars.iloc[-1][self.pair[0]] + self.bars.iloc[-1][self.pair[1]])*self.signals.cumsum()   # This strategy buys 1 shares
         return positions
                     
     def backtest_portfolio(self):
         portfolio = pd.DataFrame(index=self.signals.index) 
-        """tradeornot = pd.DataFrame(index=signals.index)
-        tradeornot = 0
-        tradeornot = self.signals[symbols[0]].apply(lambda x: 1 if x <> 0 else 0)  
-        """
-        for symbol in self.symbols:
-            portfolio[symbol] = self.positions[symbol]*self.bars[symbol]
-        pos_diff = self.positions.diff().fillna(0.0)               
-        
 
+        pos_diff = self.signals.fillna(0.0)               
+        #CaculationMatrix['pair']
+        
         portfolio['holdings'] = (self.positions*self.bars).sum(axis=1)
         portfolio['cash'] = self.initial_capital - (pos_diff*self.bars).sum(axis=1).cumsum()
 
         portfolio['total'] = portfolio['cash'] + portfolio['holdings']
         portfolio['returns'] = portfolio['total'].pct_change()
+        
+        portfolio['SPY'] = get_price('SPY',self.signals.index[0])
+        portfolio['SPY'] = self.initial_capital/portfolio['SPY'][0]*portfolio['SPY']
+        
         return portfolio
-
+    
+    
+    def backtest_statistic(self):
+        portfolio = self.backtest_portfolio()
+        statistic = {}
+        """tradeornot = pd.DataFrame(index=signals.index)
+        tradeornot["trade"] = 0
+        tradeornot[self.signals[self.symbols[0]]<>0] = 1"""
+        
+        earnpertrade = portfolio[self.signals[self.pair[0]]<>0].diff().fillna(0.0)['total']
+        statistic["win"] = earnpertrade[earnpertrade > 0].count()
+        statistic["winvalue"] = round(earnpertrade[earnpertrade > 0].sum(),2)
+        statistic["lose"] = earnpertrade[earnpertrade < 0].count()
+        statistic["losevalue"] = round(earnpertrade[earnpertrade < 0].sum(),2)
+        statistic["P/L"] = statistic["winvalue"] + statistic["losevalue"]
+        statistic["Profit factor"] = round(-statistic["winvalue"] / statistic["losevalue"],2)
+        return statistic
+    
        
 if __name__ == '__main__':
-    pair = ("AAPL","GOOGL")
+    pair = ("SPY","AAPL")
     bars = generate_bars(pair)
     #generate trading signals
-    mypair = SinglePairstradingStrategy(pair,bars)
+    #mypair = SinglePairstradingStrategy(pair,bars,buy_signal=1,sell_signal=-2, window=30)
+    mypair = SinglePairstradingStrategy(pair,bars,buy_signal=-2,sell_signal=2, window=30)
     signals = mypair.generate_signals()
     
     # Create a portfolio of pairtrading, with $100,000 initial capital
     portfolio = PairstradingPortfolio(pair, bars, signals, initial_capital=100000.0)
     returns = portfolio.backtest_portfolio()
+    statistic = portfolio.backtest_statistic()
     
     
     # Plot two charts to assess trades and equity curve
