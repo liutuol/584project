@@ -50,8 +50,12 @@ def download_ohlc(sector_tickers, start, end):
     sector_ohlc = {}
     for tickers in sector_tickers["ticker"]:
         print 'Downloading data from Yahoo for %s ' % tickers
-        data = DataReader(tickers, 'yahoo', start, end)
-        sector_ohlc[tickers] = data
+        try:
+            data = DataReader(tickers, 'yahoo', start, end)
+            sector_ohlc[tickers] = data
+        except IOError:
+            print 'Someproblem wiht downloading for %s ' % tickers
+        
     print 'Finished downloading data'
     return sector_ohlc
 
@@ -72,12 +76,12 @@ def get_snp500():
 
 def get_price(ticker, start, end=datetime.today().utcnow(),pricetype="Adj Close"):
     if os.path.exists('SNP_500.h5'):
-        print ("read data from local mechine")
-        store = pd.HDFStore('SNP_500.h5')
+        #print 'read %s from local mechine' % ticker 
+        store = pd.HDFStore('SNP_500.h5')        
         price = store[ticker][pricetype]
-        store.close
+        store.close          
     else:
-        print ("connect to network,read data from yahoo")
+        #print 'connect to network,read %s from yahoo' % ticker
         data = DataReader(ticker, 'yahoo', start, end)
         price = data[pricetype]
     return price.loc[start:end]
@@ -85,9 +89,10 @@ def get_price(ticker, start, end=datetime.today().utcnow(),pricetype="Adj Close"
 
 
 if __name__ == '__main__':
-    #AAPL=get_price("AAPL", "2003-01-21")
+    AAPL=get_price("AAPL", "2003-01-21")
+    print AAPL
     #sector_tickers = scrape_list(SITE)
-    get_snp500()
+    #get_snp500()
     
     #import h5py
     #f=h5py.File('snp500.h5', 'r')

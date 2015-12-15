@@ -6,10 +6,13 @@ Created on Sun Nov 08 16:28:06 2015
 """
 
 # Temperature-conversion program using PyQt
+
 import pandas as pd
 import sys
+
 from PyQt4 import QtGui,uic,QtCore
-from getyahooandstore import get_price
+import getyahooandstore as gy
+#from getyahooandstore import get_price
 from matplotlib.backends.backend_qt4agg import FigureCanvasQTAgg as FigureCanvas
 from matplotlib.backends.backend_qt4agg import NavigationToolbar2QTAgg as NavigationToolbar
 import matplotlib.pyplot as plt
@@ -31,7 +34,12 @@ class MyWindowClass(QtGui.QMainWindow, form_class):
         self.pushButton.clicked.connect(self.plot)
         self.pushButton_2.clicked.connect(self.plot_2)
         self.pushButton_3.clicked.connect(self.plot_3)
-        self.pushButton_4.clicked.connect(self.plot_4)
+        self.Problem1Button.clicked.connect(self.Problem1plot)
+        self.AnalysisButton.clicked.connect(self.Analysisplot)
+        self.Problem2Button.clicked.connect(self.Problem2plot)
+        self.Problem2Button_MA.clicked.connect(self.Problem2plot_MA)
+        self.Problem3Button.clicked.connect(self.Problem3plot)
+        self.Problem3Button_2.clicked.connect(self.Problem3plot_rebalance)
         #connect to tableview
         self.tableData = QtGui.QStandardItemModel(1, 6)
         #tableData.setData(tableData.index(0, 0), QtCore.QVariant("SB"))
@@ -58,16 +66,12 @@ class MyWindowClass(QtGui.QMainWindow, form_class):
         self.figure_3 = plt.figure()
         #plot1
 
-        self.canvas = FigureCanvas(self.figure)
-        self.toolbar = NavigationToolbar(self.canvas, self)       
-        self.plotlayout.addWidget(self.toolbar)
+        self.canvas = FigureCanvas(self.figure)        
         self.plotlayout.addWidget(self.canvas)
 
         #plot2
         #self.figure_2 = plt.figure()
-        self.canvas_2 = FigureCanvas(self.figure_2)
-        self.toolbar_2 = NavigationToolbar(self.canvas_2, self)   
-        self.plotlayout_2.addWidget(self.toolbar_2)
+        self.canvas_2 = FigureCanvas(self.figure_2)        
         self.plotlayout_2.addWidget(self.canvas_2)
         
         #plot2
@@ -79,8 +83,8 @@ class MyWindowClass(QtGui.QMainWindow, form_class):
 
         
     def plot(self):
-        ticker = self.lineEdit.text()        
-        data = get_price(ticker, START)
+        ticker = str(self.lineEdit.text())      
+        data = gy.get_price(ticker, START)
         # create an axis
         ax = self.figure.add_subplot(111)
         # discards the old graph
@@ -90,8 +94,8 @@ class MyWindowClass(QtGui.QMainWindow, form_class):
         # refresh canvas
         self.canvas.draw()
     def plot_2(self):
-        ticker = self.lineEdit_2.text()        
-        data = get_price(ticker, START)
+        ticker = str(self.lineEdit_2.text())        
+        data = gy.get_price(ticker, START)
         # create an axis
         ax = self.figure_2.add_subplot(111)
         # discards the old graph
@@ -102,12 +106,16 @@ class MyWindowClass(QtGui.QMainWindow, form_class):
         self.canvas_2.draw()   
     
     def plot_3(self):           #backtest result
-        pair = (self.lineEdit.text(),self.lineEdit_2.text())
+        self.figure_3.clf()
+        pair = (str(self.lineEdit.text()),str(self.lineEdit_2.text()))
         bars = Pairstrading.generate_bars(pair)
         #generate trading signals
         mypair = Pairstrading.SinglePairstradingStrategy(pair,bars,buy_signal=self.buy_signal.text()
                                                         ,sell_signal=self.sell_signal.text(), window=self.window.text())
-        signals = mypair.generate_signals()
+        
+        signals = mypair.generate_signals() 
+        #signals = mypair.generate_signals()*(mypair.generate_signals_MA().cumsum())
+        
         # Create a portfolio of pairtrading, with $100,000 initial capital
         portfolio = Pairstrading.PairstradingPortfolio(pair, bars, signals, initial_capital=100000.0)
         returns = portfolio.backtest_portfolio()
@@ -164,71 +172,238 @@ class MyWindowClass(QtGui.QMainWindow, form_class):
                  returns.total[signals[pair[0]] < 0],
                  'v', markersize=10, color='k')
         """
+        # refresh canvas 
+                 
+        self.canvas_3.draw()
+        ##refresh statistc data
+        for  n, key in enumerate(sorted(self.statistic.keys())):
+            self.tableData.setData(self.tableData.index(0, n), str(self.statistic[key]))
+            
+        
+    def Problem1plot(self):           #backtest result
+        self.figure_3.clf()
+        mypairs = [(str(self.pair1_stocka.text()),str(self.pair1_stockb.text())),
+                   (str(self.pair2_stocka.text()),str(self.pair2_stockb.text())),
+                   (str(self.pair3_stocka.text()),str(self.pair3_stockb.text())),
+                   (str(self.pair4_stocka.text()),str(self.pair4_stockb.text()))]
+        buysignals = (self.buy_signal_1.text(),self.buy_signal_2.text(),self.buy_signal_3.text(),self.buy_signal_4.text())
+        sellsignals = (self.sell_signal_1.text(),self.sell_signal_2.text(),self.sell_signal_3.text(),self.sell_signal_4.text())
+        multibars,multisignals = Pairstrading.multiplepair_signalgenerate(mypairs,buysignals,sellsignals)
+        #multiple the signal by a factor of pair_number
+        multisignals[0] = multisignals[0]*float(self.pair1_number.text())
+        multisignals[1] = multisignals[1]*float(self.pair2_number.text())
+        multisignals[2] = multisignals[2]*float(self.pair3_number.text()) 
+        multisignals[3] = multisignals[3]*float(self.pair4_number.text())
+        # Create a portfolio of pairtrading, with $100,000 initial capital
+        portfolio = Pairstrading.Problem1Portfolio(multibars, multisignals, initial_capital=100000.0)
+        returns = portfolio.backtest_portfolio()
+        self.statistic = portfolio.backtest_statistic()
+        #generate trading signals       
+                 
+        ax2 = self.figure_3.add_subplot(111)
+        # discards the old graph
+        ax2.hold(False)
+        # plot data
+                
+        ax2.plot(returns.index,returns['total'],label='Portfolio',color='r')                  
+        ax2.hold(True)
+        ax2.plot(returns.index,returns['SPY'],label='SPY') 
+        plt.legend(loc=0)
+        plt.ylabel('Portfolio value in $')
+        
         # refresh canvas          
         self.canvas_3.draw()
         ##refresh statistc data
         for  n, key in enumerate(sorted(self.statistic.keys())):
             self.tableData.setData(self.tableData.index(0, n), str(self.statistic[key]))
+    def Problem2plot(self):           #backtest result
+        self.figure_3.clf()
+        mypairs = [(str(self.pair1_stocka.text()),str(self.pair1_stockb.text())),
+                   (str(self.pair2_stocka.text()),str(self.pair2_stockb.text())),
+                   (str(self.pair3_stocka.text()),str(self.pair3_stockb.text())),
+                   (str(self.pair4_stocka.text()),str(self.pair4_stockb.text()))]
+        buysignals = (self.buy_signalset_1.text(),self.buy_signalset_2.text(),self.buy_signalset_3.text())
+        sellsignals = (self.sell_signalset_1.text(),self.sell_signalset_2.text(),self.sell_signalset_3.text())
+        multibars,multisignals = Pairstrading.multiplepair_signalgenerate_problem2(mypairs,buysignals,sellsignals)
+        #multiple the signal by a factor of pair_number
+        multisignals[0] = multisignals[0]*float(self.pair1_number.text())
+        multisignals[1] = multisignals[1]*float(self.pair2_number.text())
+        multisignals[2] = multisignals[2]*float(self.pair3_number.text()) 
+        multisignals[3] = multisignals[3]*float(self.pair4_number.text())
         
-
-    
-    def plot_4(self):           #backtest result
-        pair = (self.lineEdit.text(),self.lineEdit_2.text())
-        bars = Pairstrading.generate_bars(pair)
-        #generate trading signals
-        mypair = Pairstrading.SinglePairstradingStrategy(pair,bars,buy_signal=self.buy_signal.text()
-                                                        ,sell_signal=self.sell_signal.text(), window=self.window.text())
-        signals = -mypair.generate_signals()
+        
         # Create a portfolio of pairtrading, with $100,000 initial capital
-        portfolio = Pairstrading.PairstradingPortfolio(pair, bars, signals, initial_capital=100000.0)
+        portfolio = Pairstrading.Problem1Portfolio(multibars, multisignals, initial_capital=100000.0)
         returns = portfolio.backtest_portfolio()
         self.statistic = portfolio.backtest_statistic()
-        AtoB = mypair.generate_AtoB()
-        
-        ax = self.figure_3.add_subplot(211)
-        
-        
-        # discards the old graph
-        ax.hold(False)
-        # plot data
-        ax.plot(AtoB.index,AtoB['delta'])
-        ax.hold(True)
-        plt.ylabel('stock1/stock2 Z')
-        # Plot the "buy" and "sell" trades against the equity curve
-        ax.plot(AtoB.ix[signals[pair[0]] > 0].index, 
-                 AtoB.delta[signals[pair[0]] > 0],
-                 '^', markersize=10, color='m')
-        ax.plot(AtoB.ix[signals[pair[0]] < 0].index, 
-                 AtoB.delta[signals[pair[0]] < 0],
-                 'v', markersize=10, color='k')
+        #generate trading signals
 
         
                  
-        ax2 = self.figure_3.add_subplot(212)
+        ax2 = self.figure_3.add_subplot(111)
         # discards the old graph
         ax2.hold(False)
         # plot data
-               
+                
         ax2.plot(returns.index,returns['total'],label='Portfolio',color='r')                  
         ax2.hold(True)
         ax2.plot(returns.index,returns['SPY'],label='SPY') 
         plt.legend(loc=0)
-        
         plt.ylabel('Portfolio value in $')
-        """
-        # Plot the "buy" and "sell" trades against the equity curve
-        ax2.plot(returns.ix[signals[pair[0]] > 0].index, 
-                 returns.total[signals[pair[0]] > 0],
-                 '^', markersize=10, color='m')
-        ax2.plot(returns.ix[signals[pair[0]] < 0].index, 
-                 returns.total[signals[pair[0]] < 0],
-                 'v', markersize=10, color='k')
-        # refresh canvas 
-        """
+        
+        # refresh canvas          
         self.canvas_3.draw()
         ##refresh statistc data
         for  n, key in enumerate(sorted(self.statistic.keys())):
             self.tableData.setData(self.tableData.index(0, n), str(self.statistic[key]))
+            
+    def Problem2plot_MA(self):           #backtest result
+        self.figure_3.clf()
+        mypairs = [(str(self.pair1_stocka.text()),str(self.pair1_stockb.text())),
+                   (str(self.pair2_stocka.text()),str(self.pair2_stockb.text())),
+                   (str(self.pair3_stocka.text()),str(self.pair3_stockb.text())),
+                   (str(self.pair4_stocka.text()),str(self.pair4_stockb.text()))]
+        buysignals = (self.buy_signalset_1.text(),self.buy_signalset_2.text(),self.buy_signalset_3.text())
+        sellsignals = (self.sell_signalset_1.text(),self.sell_signalset_2.text(),self.sell_signalset_3.text())
+        multibars,multisignals = Pairstrading.multiplepair_signalgenerate_problem2_MA(mypairs,buysignals,sellsignals)
+        #multiple the signal by a factor of pair_number
+        multisignals[0] = multisignals[0]*float(self.pair1_number.text())
+        multisignals[1] = multisignals[1]*float(self.pair2_number.text())
+        multisignals[2] = multisignals[2]*float(self.pair3_number.text()) 
+        multisignals[3] = multisignals[3]*float(self.pair4_number.text())
+        
+        
+        # Create a portfolio of pairtrading, with $100,000 initial capital
+        portfolio = Pairstrading.Problem1Portfolio(multibars, multisignals, initial_capital=100000.0)
+        returns = portfolio.backtest_portfolio()
+        self.statistic = portfolio.backtest_statistic()
+        #generate trading signals
+
+        
+                 
+        ax2 = self.figure_3.add_subplot(111)
+        # discards the old graph
+        ax2.hold(False)
+        # plot data
+                
+        ax2.plot(returns.index,returns['total'],label='Portfolio',color='r')                  
+        ax2.hold(True)
+        ax2.plot(returns.index,returns['SPY'],label='SPY') 
+        plt.legend(loc=0)
+        plt.ylabel('Portfolio value in $')
+        
+        # refresh canvas          
+        self.canvas_3.draw()
+        ##refresh statistc data
+        for  n, key in enumerate(sorted(self.statistic.keys())):
+            self.tableData.setData(self.tableData.index(0, n), str(self.statistic[key]))
+
+    def Problem3plot(self):           #backtest result
+        self.figure_3.clf()
+        mypairs = [(str(self.pair1_stocka.text()),str(self.pair1_stockb.text())),
+                   (str(self.pair2_stocka.text()),str(self.pair2_stockb.text())),
+                   (str(self.pair3_stocka.text()),str(self.pair3_stockb.text())),
+                   (str(self.pair4_stocka.text()),str(self.pair4_stockb.text()))]
+        buysignals = (self.buy_signalset_1.text(),self.buy_signalset_2.text(),self.buy_signalset_3.text())
+        sellsignals = (self.sell_signalset_1.text(),self.sell_signalset_2.text(),self.sell_signalset_3.text())
+        multibars,multisignals = Pairstrading.multiplepair_signalgenerate_problem2_MA(mypairs,buysignals,sellsignals)
+        #multiple the signal by a factor of pair_number
+        multisignals[0] = multisignals[0]*float(self.pair1_number.text())
+        multisignals[1] = multisignals[1]*float(self.pair2_number.text())
+        multisignals[2] = multisignals[2]*float(self.pair3_number.text()) 
+        multisignals[3] = multisignals[3]*float(self.pair4_number.text())
+        
+        
+        # Create a portfolio of pairtrading, with $100,000 initial capital
+        portfolio = Pairstrading.Problem3Portfolio(multibars, multisignals, initial_capital=100000.0)
+        returns = portfolio.backtest_portfolio()
+        self.statistic = portfolio.backtest_statistic()
+        #generate trading signals
+
+        
+                 
+        ax2 = self.figure_3.add_subplot(111)
+        # discards the old graph
+        ax2.hold(False)
+        # plot data
+                
+        ax2.plot(returns.index,returns['total'],label='Portfolio',color='r')                  
+        ax2.hold(True)
+        ax2.plot(returns.index,returns['SPY'],label='SPY') 
+        plt.legend(loc=0)
+        plt.ylabel('Portfolio value in $')
+        
+        # refresh canvas          
+        self.canvas_3.draw()
+        ##refresh statistc data
+        for  n, key in enumerate(sorted(self.statistic.keys())):
+            self.tableData.setData(self.tableData.index(0, n), str(self.statistic[key]))
+
+    def Problem3plot_rebalance(self):           #backtest result
+        self.figure_3.clf()
+        mypairs = [(str(self.pair1_stocka.text()),str(self.pair1_stockb.text())),
+                   (str(self.pair2_stocka.text()),str(self.pair2_stockb.text())),
+                   (str(self.pair3_stocka.text()),str(self.pair3_stockb.text())),
+                   (str(self.pair4_stocka.text()),str(self.pair4_stockb.text()))]
+        buysignals = (self.buy_signalset_1.text(),self.buy_signalset_2.text(),self.buy_signalset_3.text())
+        sellsignals = (self.sell_signalset_1.text(),self.sell_signalset_2.text(),self.sell_signalset_3.text())
+        multibars,multisignals = Pairstrading.multiplepair_signalgenerate_problem2_MA(mypairs,buysignals,sellsignals)
+        #multiple the signal by a factor of pair_number
+        multisignals[0] = multisignals[0]*float(self.pair1_number.text())
+        multisignals[1] = multisignals[1]*float(self.pair2_number.text())
+        multisignals[2] = multisignals[2]*float(self.pair3_number.text()) 
+        multisignals[3] = multisignals[3]*float(self.pair4_number.text())
+        
+        
+        # Create a portfolio of pairtrading, with $100,000 initial capital
+        portfolio = Pairstrading.Problem3Portfolio_rebalance(multibars, multisignals, initial_capital=100000.0,lookwindow =self.rebalancedays.text())
+        returns = portfolio.backtest_portfolio()
+        self.statistic = portfolio.backtest_statistic()
+        #generate trading signals
+
+        
+                 
+        ax2 = self.figure_3.add_subplot(111)
+        # discards the old graph
+        ax2.hold(False)
+        # plot data
+                
+        ax2.plot(returns.index,returns['total'],label='Portfolio',color='r')                  
+        ax2.hold(True)
+        ax2.plot(returns.index,returns['SPY'],label='SPY') 
+        plt.legend(loc=0)
+        plt.ylabel('Portfolio value in $')
+        
+        # refresh canvas          
+        self.canvas_3.draw()
+        ##refresh statistc data
+        for  n, key in enumerate(sorted(self.statistic.keys())):
+            self.tableData.setData(self.tableData.index(0, n), str(self.statistic[key]))
+            
+            
+    def Analysisplot(self):           #backtest result
+        self.figure_3.clf()
+        pair = (str(self.lineEdit.text()),str(self.lineEdit_2.text()))
+        bars = Pairstrading.generate_bars(pair)
+        #generate trading signals
+        self.windowT = int(self.window.text())
+        mypair = Pairstrading.SinglePairstradingStrategy(pair,bars,buy_signal=self.buy_signal.text()
+                                                        ,sell_signal=self.sell_signal.text(), window=self.window.text())
+
+        AtoB = mypair.generate_AtoB()
+        
+        ax = self.figure_3.add_subplot(111)
+       
+        ax.hold(False) 
+        ax.plot(AtoB.index,AtoB['A/B'])
+        ax.hold(True)
+        
+        plt.ylabel(pair[0]+'/'+ pair[1])
+        #add moving average
+        mavg = pd.rolling_mean(AtoB['A/B'], self.windowT, min_periods=1)
+        mavg.plot(ax=ax, lw=2.)                 
+        self.canvas_3.draw()
+        ##refresh statistc data
         
 class StatistiTable(QtGui.QStandardItemModel):
     def __init__(self, data, *args):
