@@ -1,0 +1,38 @@
+good strategy:
+1. a lot of uncorrelated one
+2. perfomance, risk matrics,how many securities you trade, how often you trade, and what the size of your positions are
+3. beta between -0.3 and +0.3, Sharpe ratio over 1.0, 
+4.algorithms that turn over their portfolio between 12 and 500 times per year (e.g between once per month and twice a day).
+don't:
+1. Overfitting : minimize the number of parameters in your model, constrain your parameter search space, 
+and develop your algorithm using a limited data set (in-sample data), 
+followed by cross-validation testing on the rest of the data, the out-of-sample.
+2. Data snooping: strategy works only on a set of companies that are large and successful today,look-ahead bias
+3. spurius correlation. need reason behind algorithm. 
+
+重要文章：
+“The Fundamental Law of Active Management”  In 1989, Richard Grinold
+
+sharp ration: IC*breadth
+IC: correlation between your algo’s predictions and the actual turn of events
+breadth: square root of the number of independent bets your algo makes
+Breadth exists across two dimensions: the cross-section and the time series
+
+To increase Sharpe ratio and produce a high quality algo, work in a few dimensions:
+  1.increase the quality of your predictions
+  2.increase the number of bets to which you apply your predictive model, and
+  3.ensure that the bets are independent
+  
+ All cross-sectional strategies can be abstracted into 6 stages: 
+ Data, Universe Definition, Alpha Discovery, Alpha Combination, Portfolio Construction, and Trading 
+ 
+ Create a hypothesis about investor behavior, market structure, information asymmetry or any other potential cause of market inefficiency
+ and see if that hypothesis has any predictive capability. Need some ideas? Try a Google search for “equity market anomalies”or,
+ even better, an SSRN search of the same.
+ 
+ There are many questions to answer in defining the step to create your ideal portfolio: Which risks do you want 
+ to be cognizant of (i.e, your risk model)? What is the objective function in the portfolio construction step? How will the portfolio be constrained?
+ 
+ 机器学习：
+ https://www.quantopian.com/posts/machine-learning-on-quantopian
+ 
